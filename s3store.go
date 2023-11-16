@@ -156,8 +156,9 @@ type S3Store struct {
 	// and for authentication. However, these hashes also consume a significant amount of
 	// CPU, so it might be desirable to disable them.
 	// Note that this property is experimental and might be removed in the future!
-	DisableContentHashes bool
-	AdditionalChecksum   types.ChecksumAlgorithm
+	//DisableContentHashes bool
+
+	AdditionalChecksum types.ChecksumAlgorithm
 
 	// uploadSemaphore limits the number of concurrent multipart part uploads to S3.
 	uploadSemaphore Semaphore
@@ -513,12 +514,13 @@ func (upload *s3Upload) uploadParts(ctx context.Context, offset int64, src io.Re
 					PartNumber:        part.number,
 					ChecksumAlgorithm: store.AdditionalChecksum,
 				}
-				etag, err := upload.putPartForUpload(ctx, uploadPartInput, file, part.size)
+				etag, checksum, err := upload.putPartForUpload(ctx, uploadPartInput, file, part.size)
 				store.observeRequestDuration(t, metricUploadPart)
 				if err != nil {
 					uploadErr = err
 				} else {
 					part.etag = etag
+					part.checksum = checksum
 				}
 				if cerr := closePart(); cerr != nil && uploadErr == nil {
 					uploadErr = cerr
@@ -558,57 +560,34 @@ func cleanUpTempFile(file *os.File) {
 	os.Remove(file.Name())
 }
 
-func (upload *s3Upload) putPartForUpload(ctx context.Context, uploadPartInput *s3.UploadPartInput, file io.ReadSeeker, size int64) (string, error) {
-	if !upload.store.DisableContentHashes {
-		// By default, use the traditional approach to upload data
-		uploadPartInput.Body = file
-		res, err := upload.store.Service.UploadPart(ctx, uploadPartInput)
-		if err != nil {
-			return "", err
-		}
-		return *res.ETag, nil
-	} else {
-		// Experimental feature to prevent the AWS SDK from calculating the SHA256 hash
-		// for the parts we upload to S3.
-		// We compute the presigned URL without the body attached and then send the request
-		// on our own. This way, the body is not included in the SHA256 calculation.
-		s3Client, ok := upload.store.Service.(*s3.Client)
-		if !ok {
-			return "", fmt.Errorf("s3store: failed to cast S3 service for presigning")
-		}
+func (upload *s3Upload) putPartForUpload(ctx context.Context, uploadPartInput *s3.UploadPartInput, file io.ReadSeeker, size int64) (string, string, error) {
 
-		presignClient := s3.NewPresignClient(s3Client)
-
-		s3Req, err := presignClient.PresignUploadPart(ctx, uploadPartInput, func(opts *s3.PresignOptions) {
-			opts.Expires = 15 * time.Minute
-		})
-		if err != nil {
-			return "", fmt.Errorf("s3store: failed to presign UploadPart: %s", err)
-		}
-
-		req, err := http.NewRequest("PUT", s3Req.URL, file)
-		if err != nil {
-			return "", err
-		}
-
-		// Set the Content-Length manually to prevent the usage of Transfer-Encoding: chunked,
-		// which is not supported by AWS S3.
-		req.ContentLength = size
-
-		res, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return "", err
-		}
-		defer res.Body.Close()
-
-		if res.StatusCode != 200 {
-			buf := new(strings.Builder)
-			io.Copy(buf, res.Body)
-			return "", fmt.Errorf("s3store: unexpected response code %d for presigned upload: %s", res.StatusCode, buf.String())
-		}
-
-		return res.Header.Get("ETag"), nil
+	// By default, use the traditional approach to upload data
+	uploadPartInput.Body = file
+	res, err := upload.store.Service.UploadPart(ctx, uploadPartInput)
+	if err != nil {
+		return "", "", err
 	}
+
+	var c *string
+	switch upload.store.AdditionalChecksum {
+	case types.ChecksumAlgorithmSha256:
+		c = res.ChecksumSHA256
+	case types.ChecksumAlgorithmCrc32c:
+		c = res.ChecksumCRC32C
+	case types.ChecksumAlgorithmCrc32:
+		c = res.ChecksumCRC32
+	case types.ChecksumAlgorithmSha1:
+		c = res.ChecksumSHA1
+	}
+	var cc string
+	if c == nil {
+		cc = ""
+	} else {
+		cc = *c
+	}
+
+	return *res.ETag, cc, nil
 }
 
 func (upload *s3Upload) GetInfo(ctx context.Context) (info handler.FileInfo, err error) {
