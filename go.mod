@@ -1,4 +1,4 @@
-module github.com/jimydavis/tusd/pkg/tusd
+module github.com/jimydavis/tusdcustoms3store
 
 go 1.21.0
 
