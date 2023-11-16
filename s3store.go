@@ -891,7 +891,7 @@ func (upload s3Upload) FinishUpload(ctx context.Context) error {
 		completedParts[index] = types.CompletedPart{
 			ETag:           aws.String(part.etag),
 			PartNumber:     part.number,
-			ChecksumSHA256: part.checksum,
+			ChecksumSHA256: &part.checksum,
 		}
 	}
 
