@@ -297,9 +297,10 @@ type s3Upload struct {
 
 // s3Part represents a single part of a S3 multipart upload.
 type s3Part struct {
-	number int32
-	size   int64
-	etag   string
+	number   int32
+	size     int64
+	etag     string
+	checksum string
 }
 
 func (store S3Store) NewUpload(ctx context.Context, info handler.FileInfo) (handler.Upload, error) {
@@ -492,9 +493,10 @@ func (upload *s3Upload) uploadParts(ctx context.Context, offset int64, src io.Re
 		isFinalChunk := !info.SizeIsDeferred && (size == offset+bytesUploaded+partsize)
 		if partsize >= store.MinPartSize || isFinalChunk {
 			part := &s3Part{
-				etag:   "",
-				size:   partsize,
-				number: nextPartNum,
+				etag:     "",
+				size:     partsize,
+				number:   nextPartNum,
+				checksum: "",
 			}
 			upload.parts = append(upload.parts, part)
 
@@ -852,11 +854,30 @@ func (upload s3Upload) FinishUpload(ctx context.Context) error {
 			return err
 		}
 
+		var c *string
+		switch store.AdditionalChecksum {
+		case types.ChecksumAlgorithmSha256:
+			c = res.ChecksumSHA256
+		case types.ChecksumAlgorithmCrc32c:
+			c = res.ChecksumCRC32C
+		case types.ChecksumAlgorithmCrc32:
+			c = res.ChecksumCRC32
+		case types.ChecksumAlgorithmSha1:
+			c = res.ChecksumSHA1
+		}
+		var cc string
+		if c == nil {
+			cc = ""
+		} else {
+			cc = *c
+		}
+
 		parts = []*s3Part{
 			{
-				etag:   *res.ETag,
-				number: 1,
-				size:   0,
+				etag:     *res.ETag,
+				number:   1,
+				size:     0,
+				checksum: cc,
 			},
 		}
 
@@ -868,8 +889,9 @@ func (upload s3Upload) FinishUpload(ctx context.Context) error {
 
 	for index, part := range parts {
 		completedParts[index] = types.CompletedPart{
-			ETag:       aws.String(part.etag),
-			PartNumber: part.number,
+			ETag:           aws.String(part.etag),
+			PartNumber:     part.number,
+			ChecksumSHA256: part.checksum,
 		}
 	}
 
@@ -984,9 +1006,10 @@ func (upload *s3Upload) concatUsingMultipart(ctx context.Context, partialUploads
 		partialS3Upload := partialUpload.(*s3Upload)
 
 		upload.parts = append(upload.parts, &s3Part{
-			number: partNumber,
-			size:   -1,
-			etag:   "",
+			number:   partNumber,
+			size:     -1,
+			etag:     "",
+			checksum: "",
 		})
 
 		go func(partNumber int32, sourceObject string) {
@@ -1047,10 +1070,30 @@ func (store S3Store) listAllParts(ctx context.Context, objectId string, multipar
 
 		parts = slices.Grow(parts, len(parts)+len((*listPtr).Parts))
 		for _, part := range (*listPtr).Parts {
+
+			var c *string
+			switch store.AdditionalChecksum {
+			case types.ChecksumAlgorithmSha256:
+				c = part.ChecksumSHA256
+			case types.ChecksumAlgorithmCrc32c:
+				c = part.ChecksumCRC32C
+			case types.ChecksumAlgorithmCrc32:
+				c = part.ChecksumCRC32
+			case types.ChecksumAlgorithmSha1:
+				c = part.ChecksumSHA1
+			}
+			var cc string
+			if c == nil {
+				cc = ""
+			} else {
+				cc = *c
+			}
+
 			parts = append(parts, &s3Part{
-				number: part.PartNumber,
-				size:   part.Size,
-				etag:   *part.ETag,
+				number:   part.PartNumber,
+				size:     part.Size,
+				etag:     *part.ETag,
+				checksum: cc,
 			})
 		}
 
