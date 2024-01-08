@@ -5,25 +5,25 @@ go 1.21.0
 toolchain go1.21.1
 
 require (
-	github.com/aws/aws-sdk-go-v2 v1.23.0
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.42.2
-	github.com/aws/smithy-go v1.17.0
+	github.com/aws/aws-sdk-go-v2 v1.24.1
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.48.0
+	github.com/aws/smithy-go v1.19.0
 	github.com/golang/mock v1.6.0
 	github.com/prometheus/client_golang v1.17.0
 	github.com/stretchr/testify v1.8.4
-	github.com/tus/tusd/v2 v2.1.0
-	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa
+	github.com/tus/tusd/v2 v2.2.1
+	golang.org/x/exp v0.0.0-20230626212559-97b1e661b5df
 )
 
 require (
-	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.5.1 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.2.3 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.5.3 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.2.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.10.1 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.2.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.10.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.16.3 // indirect
+	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.5.4 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.2.10 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.5.10 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.2.10 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.10.4 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.2.10 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.10.10 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.16.10 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bmizerany/pat v0.0.0-20170815010413-6226ea591a40 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect

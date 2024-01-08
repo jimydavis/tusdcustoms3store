@@ -393,7 +393,7 @@ func (upload *s3Upload) writeInfo(ctx context.Context, info handler.FileInfo) er
 		Bucket:            aws.String(store.Bucket),
 		Key:               store.metadataKeyWithPrefix(upload.objectId + ".info"),
 		Body:              bytes.NewReader(infoJson),
-		ContentLength:     int64(len(infoJson)),
+		ContentLength:     aws.Int64(int64(len(infoJson))),
 		ChecksumAlgorithm: store.AdditionalChecksum,
 	})
 	store.observeRequestDuration(t, metricPutInfoObject)
@@ -511,7 +511,7 @@ func (upload *s3Upload) uploadParts(ctx context.Context, offset int64, src io.Re
 					Bucket:            aws.String(store.Bucket),
 					Key:               store.keyWithPrefix(upload.objectId),
 					UploadId:          aws.String(upload.multipartId),
-					PartNumber:        part.number,
+					PartNumber:        aws.Int32(part.number),
 					ChecksumAlgorithm: store.AdditionalChecksum,
 				}
 				etag, checksum, err := upload.putPartForUpload(ctx, uploadPartInput, file, part.size)
@@ -726,7 +726,7 @@ func (upload s3Upload) GetReader(ctx context.Context) (io.ReadCloser, error) {
 		Bucket:   aws.String(store.Bucket),
 		Key:      store.keyWithPrefix(upload.objectId),
 		UploadId: aws.String(upload.multipartId),
-		MaxParts: 0,
+		MaxParts: aws.Int32(0),
 	})
 	if err == nil {
 		// The multipart upload still exists, which means we cannot download it yet
@@ -783,7 +783,7 @@ func (upload s3Upload) Terminate(ctx context.Context) error {
 						Key: store.metadataKeyWithPrefix(upload.objectId + ".info"),
 					},
 				},
-				Quiet: true,
+				Quiet: aws.Bool(true),
 			},
 		})
 
@@ -825,7 +825,7 @@ func (upload s3Upload) FinishUpload(ctx context.Context) error {
 			Bucket:            aws.String(store.Bucket),
 			Key:               store.keyWithPrefix(upload.objectId),
 			UploadId:          aws.String(upload.multipartId),
-			PartNumber:        1,
+			PartNumber:        aws.Int32(1),
 			Body:              bytes.NewReader([]byte{}),
 			ChecksumAlgorithm: store.AdditionalChecksum,
 		})
@@ -869,7 +869,7 @@ func (upload s3Upload) FinishUpload(ctx context.Context) error {
 	for index, part := range parts {
 		completedParts[index] = types.CompletedPart{
 			ETag:           aws.String(part.etag),
-			PartNumber:     part.number,
+			PartNumber:     aws.Int32(part.number),
 			ChecksumSHA256: &part.checksum,
 		}
 	}
@@ -998,7 +998,7 @@ func (upload *s3Upload) concatUsingMultipart(ctx context.Context, partialUploads
 				Bucket:     aws.String(store.Bucket),
 				Key:        store.keyWithPrefix(upload.objectId),
 				UploadId:   aws.String(upload.multipartId),
-				PartNumber: partNumber,
+				PartNumber: aws.Int32(partNumber),
 				CopySource: aws.String(store.Bucket + "/" + *store.keyWithPrefix(sourceObject)),
 			})
 			if err != nil {
@@ -1069,14 +1069,14 @@ func (store S3Store) listAllParts(ctx context.Context, objectId string, multipar
 			}
 
 			parts = append(parts, &s3Part{
-				number:   part.PartNumber,
-				size:     part.Size,
+				number:   *part.PartNumber,
+				size:     *part.Size,
 				etag:     *part.ETag,
 				checksum: cc,
 			})
 		}
 
-		if listPtr.IsTruncated {
+		if listPtr.IsTruncated != nil && *listPtr.IsTruncated {
 			partMarker = listPtr.NextPartNumberMarker
 		} else {
 			break
@@ -1107,7 +1107,7 @@ func (store S3Store) downloadIncompletePartForUpload(ctx context.Context, upload
 	if err != nil {
 		return nil, err
 	}
-	if n < incompleteUploadObject.ContentLength {
+	if n < *incompleteUploadObject.ContentLength {
 		return nil, errors.New("short read of incomplete upload")
 	}
 
@@ -1147,7 +1147,7 @@ func (store S3Store) headIncompletePartForUpload(ctx context.Context, uploadId s
 		return 0, err
 	}
 
-	return obj.ContentLength, nil
+	return *obj.ContentLength, nil
 }
 
 func (store S3Store) putIncompletePartForUpload(ctx context.Context, uploadId string, file io.ReadSeeker) error {
